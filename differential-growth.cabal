@@ -1,0 +1,77 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 4efbacc9e2f64d375c4809ef9b2dabf185ed1d19a6894b2da22d1e857bd8bb34
+
+name:           differential-growth
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/differential-growth#readme>
+homepage:       https://github.com/githubuser/differential-growth#readme
+bug-reports:    https://github.com/githubuser/differential-growth/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2020 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/differential-growth
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_differential_growth
+  hs-source-dirs:
+      src
+  build-depends:
+      MonadRandom
+    , base >=4.7 && <5
+    , chaosbox
+    , containers
+    , linear
+    , vector
+  default-language: Haskell2010
+
+executable differential-growth-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_differential_growth
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      MonadRandom
+    , base >=4.7 && <5
+    , chaosbox
+    , containers
+    , differential-growth
+    , linear
+    , vector
+  default-language: Haskell2010
+
+test-suite differential-growth-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_differential_growth
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      MonadRandom
+    , base >=4.7 && <5
+    , chaosbox
+    , containers
+    , differential-growth
+    , linear
+    , vector
+  default-language: Haskell2010
