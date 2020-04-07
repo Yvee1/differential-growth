@@ -6,8 +6,8 @@ import Linear.Metric
 import Linear.Vector
 import Control.Monad.Random.Class (getRandomR, getRandomRs)
 import Control.Monad.IO.Class
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as M
 import Data.Vector.Unboxed (Vector, (!))
 import qualified Data.Vector.Unboxed as V
 
@@ -34,7 +34,7 @@ newNode (x :& y) r θ maxΔθ = do
 
 start :: P2 -> Double -> Int -> Generate System
 start c r n = do
-  let maxΔθ = pi * r / (fromIntegral n) / 2
+  let maxΔθ = pi * r / (fromIntegral n)
   nodes <- pure V.fromList <*> sequence [newNode c r θ maxΔθ | i <- [1..n], let θ = (fromIntegral i) * 2 * pi / (fromIntegral n)]
 
   return (nodes, connect nodes, V.replicate n 0)
@@ -64,13 +64,12 @@ updateSystem s = do
   return s'
 
 attractNodes :: System -> Generate System
--- attractNodes = undefined
 attractNodes (nodes, edges, vels) = do
-  let f (i, j) = [(i, ni), (j, nj)]
+  let attract (i, j) = [(i, ni), (j, nj)]
         where (ni, nj) = attractPair ((nodes ! i), (nodes ! j))
 
   -- attractionForces :: [(Int, Vec)]
-  let attractionForces = concat . map f . V.toList $ edges
+  let attractionForces = concatMap attract . V.toList $ edges
   let forces = M.fromListWith (+) attractionForces
   let vels' = V.imap (\i v -> v + forces M.! i) vels
   let nodes' = V.imap (\i pt -> pt + vels' ! i) nodes
@@ -81,4 +80,4 @@ attractionForce :: Double
 attractionForce = 0.1
 
 attractPair :: (Node, Node) -> (Vec, Vec)
-attractPair (n1, n2) = (normalize (n2 - n1) ^* attractionForce, normalize (n1 - n2) ^* attractionForce)
+attractPair (n1, n2) = ((n2 - n1) ^* attractionForce, (n1 - n2) ^* attractionForce)

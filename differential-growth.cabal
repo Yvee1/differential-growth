@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4efbacc9e2f64d375c4809ef9b2dabf185ed1d19a6894b2da22d1e857bd8bb34
+-- hash: 97706d96749941c4cae3cd3f33effe9cdcd35671c2139c50c593ffaa3e9dadf7
 
 name:           differential-growth
 version:        0.1.0.0
@@ -15,7 +15,6 @@ author:         Author name here
 maintainer:     example@example.com
 copyright:      2020 Author name here
 license:        BSD3
-license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
