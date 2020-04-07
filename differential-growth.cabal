@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 97706d96749941c4cae3cd3f33effe9cdcd35671c2139c50c593ffaa3e9dadf7
+-- hash: 82bea300e18a0b5b249042750b0054691f22c8c8ecd0453335ad7a125026f5ba
 
 name:           differential-growth
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
     , base >=4.7 && <5
     , chaosbox
     , containers
+    , kdt
     , linear
     , vector
   default-language: Haskell2010
@@ -53,6 +54,7 @@ executable differential-growth-exe
     , chaosbox
     , containers
     , differential-growth
+    , kdt
     , linear
     , vector
   default-language: Haskell2010
@@ -71,6 +73,7 @@ test-suite differential-growth-test
     , chaosbox
     , containers
     , differential-growth
+    , kdt
     , linear
     , vector
   default-language: Haskell2010

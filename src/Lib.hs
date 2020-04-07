@@ -10,6 +10,8 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as M
 import Data.Vector.Unboxed (Vector, (!))
 import qualified Data.Vector.Unboxed as V
+import qualified Data.KdTree.Static as KD
+import Data.Foldable (toList)
 
 type Pt = P2
 type Node = Pt
@@ -68,9 +70,16 @@ attractNodes (nodes, edges, vels) = do
   let attract (i, j) = [(i, ni), (j, nj)]
         where (ni, nj) = attractPair ((nodes ! i), (nodes ! j))
 
-  -- attractionForces :: [(Int, Vec)]
+  --  attractionForces :: [(Int, Vec)]
   let attractionForces = concatMap attract . V.toList $ edges
-  let forces = M.fromListWith (+) attractionForces
+
+  let indexedNodeList = zip [0..] (V.toList nodes)
+  let kdt = KD.build (\(_, v) -> toList v) indexedNodeList
+  
+  --  rejectionForces :: [(Int, Vec)]
+  let rejectionForces = concatMap (\ni@(_, n) -> rejectNodes n (KD.inRadius kdt rejectionRadius ni)) indexedNodeList
+
+  let forces = M.fromListWith (+) (attractionForces ++ rejectionForces)
   let vels' = V.imap (\i v -> v + forces M.! i) vels
   let nodes' = V.imap (\i pt -> pt + vels' ! i) nodes
 
@@ -79,5 +88,15 @@ attractNodes (nodes, edges, vels) = do
 attractionForce :: Double
 attractionForce = 0.1
 
+rejectionForce :: Double
+rejectionForce = 0
+
+rejectionRadius :: Double
+rejectionRadius = 0.3
+
 attractPair :: (Node, Node) -> (Vec, Vec)
 attractPair (n1, n2) = ((n2 - n1) ^* attractionForce, (n1 - n2) ^* attractionForce)
+
+rejectNodes :: Node -> [(Int, Node)] -> [(Int, Vec)]
+rejectNodes n ns = map (rejectPair n) . filter (\(_, n') -> n' /= n) $ ns
+  where rejectPair n1 (i, n2) = (i, (n2 - n1) ^* rejectionForce)
