@@ -8,15 +8,15 @@ import Control.Monad.Random.Class (getRandomR, getRandomRs)
 import Control.Monad.IO.Class
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as M
-import Data.Vector.Unboxed (Vector, (!))
-import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Unboxed as U
+import qualified Data.Vector as V
 import qualified Data.KdTree.Static as KD
 import Data.Foldable (toList)
 
 type Pt = P2
 type Node = Pt
-type Edge = (Int, Int)
-type System = (Vector Node, Vector Edge, Vector Vec)
+type Adjecencies = (Int, [Int])
+type System = (U.Vector Node, V.Vector Adjecencies, U.Vector Vec)
 
 type Vec = V2 Double
 
@@ -37,15 +37,15 @@ newNode (x :& y) r θ maxΔθ = do
 start :: P2 -> Double -> Int -> Generate System
 start c r n = do
   let maxΔθ = pi * r / (fromIntegral n)
-  nodes <- pure V.fromList <*> sequence [newNode c r θ maxΔθ | i <- [1..n], let θ = (fromIntegral i) * 2 * pi / (fromIntegral n)]
+  nodes <- pure U.fromList <*> sequence [newNode c r θ maxΔθ | i <- [1..n], let θ = (fromIntegral i) * 2 * pi / (fromIntegral n)]
 
-  return (nodes, connect nodes, V.replicate n 0)
+  return (nodes, connect nodes, U.replicate n 0)
 
 -- Returns the edges that connect the given nodes
 -- in order. Last point is connected to the first.
-connect :: Vector Node -> Vector Edge
-connect pts = V.fromList [(i, (i+1) `rem` n) | i <- [0..n-1]]
-  where n = V.length pts
+connect :: U.Vector Node -> V.Vector Adjecencies
+connect pts = V.fromList [(i, [(i+1) `rem` n, (i-1) `mod` n]) | i <- [0..n-1]]
+  where n = U.length pts
 
 drawSystem :: System -> Render ()
 drawSystem system = drawEdges system *> drawNodes system
@@ -53,12 +53,17 @@ drawSystem system = drawEdges system *> drawNodes system
 drawEdges :: System -> Render ()
 drawEdges (nodes, edges, _) = do
   setSourceHSV (HSV (180/360) 1 1)
-  V.mapM_ (\(i, j) -> draw (Line (nodes ! i) (nodes ! j)) *> stroke) edges
+  V.mapM_ (\(i, js) -> mapM_ (\j -> draw (Line (nodes U.! i) (nodes U.! j)) *> stroke) js) edges
 
 drawNodes :: System -> Render ()
 drawNodes (nodes, _, _) = do
   setSourceRGB white
-  V.mapM_ (\n -> draw n *> fill) nodes
+  U.mapM_ (\n -> draw n *> fill) nodes
+
+drawRejectionRadius :: System -> Render ()
+drawRejectionRadius (nodes, _, _) = do
+  setSourceHSVA $ WithAlpha (HSV 120 1 1) 0.4
+  U.mapM_ (\n -> draw (circle n rejectionRadius) *> fill) nodes
 
 updateSystem :: System -> Generate System
 updateSystem s = do
@@ -67,36 +72,48 @@ updateSystem s = do
 
 attractNodes :: System -> Generate System
 attractNodes (nodes, edges, vels) = do
-  let attract (i, j) = [(i, ni), (j, nj)]
-        where (ni, nj) = attractPair ((nodes ! i), (nodes ! j))
+  let attract (i, js) = attractNeighbours (nodes U.! i) (map (\j -> (j, nodes U.! j)) js)
 
   --  attractionForces :: [(Int, Vec)]
-  let attractionForces = concatMap attract . V.toList $ edges
+      attractionForces = concatMap attract . V.toList $ edges
+      indexedNodeList = zip [0..] (U.toList nodes)
+      kdt = KD.build (\(_, v) -> toList v) indexedNodeList
+      
+      reject ni@(i, n) = rejectNodes n toReject
+        where toReject = filter (\(j, _) -> i /= j && not (j `elem` (snd (edges V.! i)))) (KD.inRadius kdt rejectionRadius ni)
 
-  let indexedNodeList = zip [0..] (V.toList nodes)
-  let kdt = KD.build (\(_, v) -> toList v) indexedNodeList
-  
   --  rejectionForces :: [(Int, Vec)]
-  let rejectionForces = concatMap (\ni@(_, n) -> rejectNodes n (KD.inRadius kdt rejectionRadius ni)) indexedNodeList
+      rejectionForces = concatMap reject indexedNodeList
 
-  let forces = M.fromListWith (+) (attractionForces ++ rejectionForces)
-  let vels' = V.imap (\i v -> v + forces M.! i) vels
-  let nodes' = V.imap (\i pt -> pt + vels' ! i) nodes
+      friction = zip [0..] $ map (\v -> -(normalize v) ^* (quadrance v) ^* frictionForce) (U.toList vels)
+  
+      forces = M.fromListWith (+) (attractionForces ++ rejectionForces ++ friction)
+      vels' = U.imap (\i v -> v + forces M.! i) vels
+      nodes' = U.imap (\i pt -> pt + vels' U.! i) nodes
 
   return (nodes', edges, vels')
 
 attractionForce :: Double
-attractionForce = 0.1
+attractionForce = 0.01
+
+restLength :: Double
+restLength = 0.8
 
 rejectionForce :: Double
-rejectionForce = 0
+rejectionForce = 0.01
 
 rejectionRadius :: Double
-rejectionRadius = 0.3
+rejectionRadius = 2
 
-attractPair :: (Node, Node) -> (Vec, Vec)
-attractPair (n1, n2) = ((n2 - n1) ^* attractionForce, (n1 - n2) ^* attractionForce)
+frictionForce = 10 :: Double
+
+attractNeighbours :: Node -> [(Int, Node)] -> [(Int, Vec)]
+attractNeighbours n ns = map (\(i, m) -> (i, attractPair n m)) ns
+
+attractPair :: Node -> Node -> Vec
+attractPair n1 n2 = normalize (n1 - n2) ^* attractionForce ^* displacement
+  where displacement = (norm (n1 - n2)) - restLength
 
 rejectNodes :: Node -> [(Int, Node)] -> [(Int, Vec)]
-rejectNodes n ns = map (rejectPair n) . filter (\(_, n') -> n' /= n) $ ns
-  where rejectPair n1 (i, n2) = (i, (n2 - n1) ^* rejectionForce)
+rejectNodes n = map (rejectPair n)
+  where rejectPair n1 (i, n2) = (i, normalize (n2 - n1) ^* rejectionForce ^/ (quadrance (n2-n1)))
